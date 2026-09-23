@@ -161,6 +161,7 @@ abgewählt werden. Details, Beispielfragen und das Antwort-Format:
 | [Rechtliche Fragen](wiki/Rechtliche-Fragen.md) | Disclaimer-Konzept, Beispielfragen, Antwortformat |
 | [Setup](wiki/Setup.md) | Detaillierte Installationsanleitung für Claude Code und Codex |
 | [Beispielprojekt](wiki/Beispielprojekt.md) | Durchgespieltes Mini-Beispiel "Sternenfänger" |
+| [Verwandte MGD-Skills](wiki/Verwandte-Skills.md) | MGD_DEV_SKILL, MGD_Todo_SKILL, MGD_Living-Documentation und der automatische Begleit-Skills-Check |
 
 ## Grenzen
 
@@ -175,9 +176,19 @@ abgewählt werden. Details, Beispielfragen und das Antwort-Format:
 
 ## Verwandte MGD-Projekte
 
+Der Fragenkatalog-Skill ist Teil einer Familie von vier zusammengehörigen KI-Agenten-Skills für
+Claude Code und ChatGPT Codex, die im selben Projekt oft gemeinsam sinnvoll sind:
+
 | Projekt | Beschreibung | Mögliche Integration |
 |---|---|---|
+| [MGD_DEV_SKILL](https://github.com/MichaelGahnDESIGN/MGD_DEV_SKILL) | Release/Sync/Backup/Cleanup/Tests/Wissensdokumentation für das Projekt | Der Fragenkatalog-Stand wird vor einem Release Teil der Projekt-Wissensdokumentation |
 | [MGD_Todo_SKILL](https://github.com/MichaelGahnDESIGN/MGD_Todo_SKILL) | Todo-Verwaltung als Skill für Claude Code/Codex, gleiches Namensschema und gleicher Aufbau | Unbeantwortete Fragen (leeres `userAnswer`) lassen sich als Todos exportieren, um sie gezielt abzuarbeiten |
+| [MGD_Living-Documentation](https://github.com/MichaelGahnDESIGN/MGD_Living-Documentation) | Lebendige Projektdokumentation (Entscheidungen, offene Punkte, Risiken, Testnachweise) als HTML+Markdown | Unbeantwortete Fragen lassen sich als offene Punkte in die Living Documentation übernehmen |
+
+> [!TIP]
+> `/fragenkatalog-setup` prüft bei der Ersteinrichtung aktiv, ob diese drei Begleit-Skills im
+> Projekt oder global bereits installiert sind, und bietet fehlende Skills zur Mitinstallation an
+> (siehe `SKILL.md`, Abschnitt "Begleit-Skills-Check").
 
 ## Lizenz
 

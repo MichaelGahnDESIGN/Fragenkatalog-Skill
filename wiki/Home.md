@@ -40,6 +40,9 @@ Kreativ-Persona, sondern mit eigenem Präfix (`⚖️`) und einem Pflicht-Discla
 - [Rechtliche Fragen](Rechtliche-Fragen.md) — Disclaimer-Konzept und Beispiele
 - [Setup](Setup.md) — Installationsanleitung Claude Code & Codex
 - [Beispielprojekt](Beispielprojekt.md) — durchgespieltes Mini-Beispiel "Sternenfänger"
+- [Verwandte MGD-Skills](Verwandte-Skills.md) — MGD_DEV_SKILL, MGD_Todo_SKILL und
+  MGD_Living-Documentation als Begleit-Skills, inkl. automatischem Installations-Check bei
+  `/fragenkatalog-setup`
 
 Die verbindliche technische Spezifikation ist immer `SKILL.md` im Repo-Root — die Wiki-Seiten
 erklären und illustrieren, ersetzen sie aber nicht.

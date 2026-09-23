@@ -153,10 +153,84 @@ Nutzer alles auf einmal angibt):
    keine Rechtsberatung ersetzt. Nur bei ausdrücklicher Ablehnung durch den Nutzer wird sie
    weggelassen — speichere diese Entscheidung als `includeLegalCategory: true|false` in
    `.fragenkatalog-config`.
+7. **Begleit-Skills-Check (einmalig)** — Der Fragenkatalog-Skill ist Teil einer Familie von vier
+   zusammengehörigen MGD-Skills (siehe auch [README.md](README.md#verwandte-mgd-projekte)):
+   **MGD_DEV_SKILL**, **Fragenkatalog-Skill** (dieser hier), **MGD_Todo_SKILL** und
+   **MGD_Living-Documentation**. Nach der bisherigen Konfiguration (Schritte 1–6) prüft der Agent
+   aktiv, ob die drei anderen Skills im aktuellen Projekt oder global bereits installiert sind, und
+   bietet fehlende Skills zur Mitinstallation an. Dies ist eine echte Prüfung mit konkreten
+   Datei-/Ordnerpfaden, kein reiner Prosa-Hinweis.
+
+   **a) Prüfpfade je Skill** (zuerst projekt-lokal relativ zum aktuellen Arbeitsverzeichnis prüfen,
+   dann global im Home-Verzeichnis des Nutzers; sobald einer der Pfade existiert, gilt der Skill
+   als installiert):
+
+   | Skill | Projekt-lokal (Claude Code / Codex) | Global (Claude Code / Codex) |
+   |---|---|---|
+   | MGD_DEV_SKILL | `.claude/commands/dev.md` / `.codex/commands/dev.md` oder `.claude/skills/dev/SKILL.md` / `.codex/skills/dev/SKILL.md` | `~/.claude/skills/dev/SKILL.md` / `~/.codex/skills/dev/SKILL.md` oder `~/.claude/commands/dev.md` / `~/.codex/commands/dev.md` |
+   | MGD_Todo_SKILL | `.claude/commands/todo.md` / `.codex/commands/todo.md` oder `PROJEKT/TODO/.todo-config` | `~/.claude/skills/todo/SKILL.md` / `~/.codex/skills/todo/SKILL.md` |
+   | MGD_Living-Documentation | `.claude/skills/living-documentation/SKILL.md` / `.codex/skills/living-documentation/SKILL.md` (bzw. `.agents/skills/living-documentation/SKILL.md`) | `~/.claude/skills/living-documentation/SKILL.md` / `~/.codex/skills/living-documentation/SKILL.md` |
+
+   Der Agent prüft diese Pfade konkret (z. B. per Datei-/Verzeichnis-Existenzcheck), nicht durch
+   bloßes Nachfragen beim Nutzer.
+
+   **b) Fehlende Skills aktiv anbieten** — Fehlt einer oder mehrere der drei Skills (kein Pfad aus
+   der Tabelle gefunden), fragt der Agent für jeden fehlenden Skill einzeln nach:
+
+   > "Ich habe festgestellt, dass [Skill X] in diesem Projekt noch nicht installiert ist. Er
+   > ergänzt [Nutzen]. Soll ich ihn jetzt mitinstallieren? (ja/nein)"
+
+   mit folgender Nutzen-Kurzfassung je Skill:
+
+   - **MGD_DEV_SKILL**: "Release/Sync/Backup/Cleanup/Tests/Wissensdokumentation rund um dieses
+     Projekt — hält u. a. den Fragenkatalog-Stand vor einem Release als Teil der
+     Projekt-Wissensdokumentation fest."
+   - **MGD_Todo_SKILL**: "eine selbst-gehostete `TODO.html` mit Bearbeiten-Funktion, in die
+     unbeantwortete Fragen aus diesem Fragenkatalog als Todos exportiert werden können."
+   - **MGD_Living-Documentation**: "eine lebendige Projektdokumentation (Entscheidungen, offene
+     Punkte, Risiken, Testnachweise), in die unbeantwortete Fragen aus diesem Fragenkatalog als
+     offene Punkte übernommen werden können."
+
+   **c) Bei Zustimmung installieren** — der Agent klont das jeweilige Repo und kopiert gemäß der in
+   diesem Repo dokumentierten Zielstruktur (Claude Code, projekt-lokal; Codex analog unter
+   `.codex/...`):
+
+   ```bash
+   # MGD_DEV_SKILL
+   git clone https://github.com/MichaelGahnDESIGN/MGD_DEV_SKILL.git /tmp/mgd-dev-skill-install
+   mkdir -p .claude/skills && cp -R /tmp/mgd-dev-skill-install/dev .claude/skills/dev
+   mkdir -p .claude/commands && cp /tmp/mgd-dev-skill-install/.claude/commands/*.md .claude/commands/
+   # Codex analog: .codex/skills/dev + .codex/commands/*.md aus /tmp/mgd-dev-skill-install/.codex/commands/
+
+   # MGD_Todo_SKILL
+   git clone https://github.com/MichaelGahnDESIGN/MGD_Todo_SKILL.git /tmp/mgd-todo-skill-install
+   mkdir -p PROJEKT/TODO && cp /tmp/mgd-todo-skill-install/todo/TODO.template.html PROJEKT/TODO/TODO.html
+   mkdir -p .claude/skills/todo && cp /tmp/mgd-todo-skill-install/SKILL.md .claude/skills/todo/SKILL.md
+   mkdir -p .claude/commands && cp /tmp/mgd-todo-skill-install/.claude/commands/todo.md .claude/commands/
+   # Codex analog: .codex/skills/todo + .codex/commands/todo.md
+
+   # MGD_Living-Documentation
+   git clone https://github.com/MichaelGahnDESIGN/MGD_Living-Documentation.git /tmp/mgd-living-doc-install
+   mkdir -p .claude/skills && cp -R /tmp/mgd-living-doc-install/skills/living-documentation .claude/skills/living-documentation
+   # Codex analog: .codex/skills/living-documentation
+   ```
+
+   Nach der Installation entfernt der Agent den temporären Klon-Ordner (`rm -rf /tmp/mgd-*-install`)
+   und bestätigt in der Setup-Zusammenfassung, welche Begleit-Skills neu installiert wurden.
+
+   **d) Ohne Netzzugriff** — kann der Agent nicht klonen (kein Internetzugriff verfügbar),
+   beschreibt er die obigen Schritte nur als konkrete Anleitung für den Nutzer, statt sie
+   auszuführen, und ergänzt am Ende jeweils den Hinweis
+   `<!-- ggf. exakte Zielpfade beim nächsten Sync mit den Ziel-Repos verifizieren -->`.
+
+   **e) Einmaligkeit** — dieser Check läuft ausschließlich innerhalb von `/fragenkatalog-setup`
+   (dem ohnehin einmaligen Erstlauf-Befehl). Alle anderen Befehle (`/fragenkatalog-generate`,
+   `/fragenkatalog-answer`, ...) fragen nicht erneut danach.
 
 Am Ende: schreibt `.fragenkatalog-config`, legt eine leere `fragenkatalog.json` (`[]`) am
-`dataPath` an, und bestätigt die Einstellungen dem Nutzer in einer kurzen Zusammenfassung.
-Schlägt vor, direkt `/fragenkatalog-generate` auszuführen.
+`dataPath` an, und bestätigt die Einstellungen (inkl. Ergebnis des Begleit-Skills-Checks aus
+Schritt 7) dem Nutzer in einer kurzen Zusammenfassung. Schlägt vor, direkt
+`/fragenkatalog-generate` auszuführen.
 
 ### `/fragenkatalog-generate [anzahl]`
 
