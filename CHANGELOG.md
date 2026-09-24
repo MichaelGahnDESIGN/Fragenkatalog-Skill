@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an diesem Projekt werden in dieser Datei dokument
 
 ## Unreleased
 
+- `templates/Fragenkatalog.template.html`: Export, Import, Speichern und Löschen funktionieren jetzt auch in
+  abgeschotteten Umgebungen (Claude-Artefakt-Vorschau, eingebettete Webviews), in denen Downloads,
+  Browser-Speicher sowie `alert()`/`confirm()` gesperrt sind. Neu: Export/Import-Fenster mit Kopieren und
+  JSON-Einfügen als Ausweichweg, sichtbarer Hinweis statt stillem Scheitern, wenn der Browser-Speicher
+  fehlt, eigene Bestätigung und Hinweise statt `alert()`/`confirm()` (Löschen ging dort vorher nie).
+
 - `SKILL.md`: `/fragenkatalog-setup` prüft jetzt einmalig aktiv (per konkretem Datei-/Ordner-Check,
   projekt-lokal und global, Claude Code und Codex) auf die drei Begleit-Skills MGD_DEV_SKILL,
   MGD_Todo_SKILL und MGD_Living-Documentation und bietet fehlende Skills zur Mitinstallation an

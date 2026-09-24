@@ -135,6 +135,12 @@
   .hidden{ display:none !important; }
   .empty-row td{ text-align:center; color:var(--text-dim); padding:30px; }
 
+  .toast{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%); max-width:min(640px,92vw);
+    background:var(--bg-elevated); color:var(--text); border:1px solid var(--border); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:12px 16px; z-index:2000; font-size:.92rem; }
+  .toast.warn{ border-color:#d97706; }
+  .notice{ margin:12px 20px; padding:10px 14px; border:1px solid #d97706; border-radius:var(--radius); font-size:.9rem; }
+  .transfer textarea{ width:100%; min-height:220px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.8rem; }
   .modal-overlay{
     position:fixed; inset:0;
     background:rgba(0,0,0,.6);
@@ -241,7 +247,40 @@
   <tbody id="tableBody"></tbody>
 </table>
 
-<footer>Fragenkatalog-Skill &middot; self-contained HTML, keine externen Abhängigkeiten &middot; Daten liegen lokal in dieser Datei + Browser-localStorage</footer>
+<footer>Fragenkatalog-Skill &middot; self-contained HTML, keine externen Abhängigkeiten &middot; Daten liegen lokal in dieser Datei + Browser-localStorage (wenn verfügbar), Sicherung über Export</footer>
+
+<div class="notice hidden" id="storageNotice" role="status">Speichern im Browser ist hier nicht verfügbar (z. B. in einer abgeschotteten Vorschau). Änderungen gehen beim Schließen verloren. Bitte regelmäßig „Export (JSON)" nutzen.</div>
+
+<!-- Bestätigungsdialog (ersetzt confirm(), das in abgeschotteten Umgebungen blockiert ist) -->
+<div class="modal-overlay hidden" id="confirmOverlay">
+  <div class="modal" role="alertdialog" aria-labelledby="confirmText">
+    <p id="confirmText"></p>
+    <div class="modal-actions"><div class="right">
+      <button id="confirmNo">Abbrechen</button>
+      <button class="primary" id="confirmYes">OK</button>
+    </div></div>
+  </div>
+</div>
+
+<!-- Export/Import-Fenster: funktioniert auch, wenn Downloads oder Dateiauswahl blockiert sind -->
+<div class="modal-overlay hidden" id="transferOverlay">
+  <div class="modal transfer" role="dialog" aria-labelledby="transferTitle">
+    <h2 id="transferTitle">Export / Import</h2>
+    <p id="transferHint" class="hint"></p>
+    <textarea id="transferText" spellcheck="false" aria-label="Fragenkatalog als JSON"></textarea>
+    <div class="modal-actions">
+      <div>
+        <button id="transferDownload">Als Datei speichern</button>
+        <button id="transferCopy">Kopieren</button>
+      </div>
+      <div class="right">
+        <button id="transferReplace">Import: Ersetzen</button>
+        <button id="transferAppend">Import: Anhängen</button>
+        <button class="primary" id="transferClose">Schließen</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Edit/Add Modal -->
 <div class="modal-overlay hidden" id="modalOverlay">
@@ -337,9 +376,41 @@
   function persist(){
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
+      document.getElementById("storageNotice").classList.add("hidden");
+      return true;
     }catch(e){
       console.warn("Fragenkatalog: localStorage konnte nicht geschrieben werden.", e);
+      document.getElementById("storageNotice").classList.remove("hidden");
+      return false;
     }
+  }
+
+  // -- Hinweise und Bestätigung ohne alert()/confirm() (in Sandboxes blockiert) --
+
+  let toastTimer = null;
+  function notify(msg, warn){
+    let t = document.getElementById("toast");
+    if(!t){
+      t = document.createElement("div");
+      t.id = "toast"; t.setAttribute("role", "status");
+      document.body.appendChild(t);
+    }
+    t.className = "toast" + (warn ? " warn" : "");
+    t.textContent = msg;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.remove(); }, 5000);
+  }
+
+  let confirmYesCb = null;
+  function askConfirm(msg, onYes){
+    document.getElementById("confirmText").textContent = msg;
+    confirmYesCb = onYes;
+    document.getElementById("confirmOverlay").classList.remove("hidden");
+    document.getElementById("confirmYes").focus();
+  }
+  function closeConfirm(){
+    document.getElementById("confirmOverlay").classList.add("hidden");
+    confirmYesCb = null;
   }
 
   function nextId(){
@@ -523,7 +594,7 @@
     const userAnswer = document.getElementById("modalUserAnswer").value.trim();
 
     if(!question){
-      alert("Bitte eine Frage eingeben.");
+      notify("Bitte eine Frage eingeben.", true);
       return;
     }
 
@@ -553,7 +624,10 @@
 
   function deleteCurrentRow(){
     if(state.editingId === null) return;
-    if(!confirm("Diese Frage wirklich löschen?")) return;
+    askConfirm("Diese Frage wirklich löschen?", doDelete);
+    return;
+  }
+  function doDelete(){
     state.data = state.data.filter(function(r){ return r.id !== state.editingId; });
     persist();
     closeModal();
@@ -567,55 +641,108 @@
 
   // -- Export / Import --------------------------------------------------
 
-  function exportData(){
-    const blob = new Blob([JSON.stringify(state.data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "fragenkatalog-export-" + new Date().toISOString().slice(0,10) + ".json";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  function exportJson(){
+    return JSON.stringify(state.data, null, 2);
+  }
+  function exportFileName(){
+    return "fragenkatalog-export-" + new Date().toISOString().slice(0,10) + ".json";
   }
 
+  function tryDownload(text){
+    try{
+      const blob = new Blob([text], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = exportFileName();
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+      return true;
+    }catch(e){
+      return false;
+    }
+  }
+
+  function openTransfer(text, hint){
+    document.getElementById("transferText").value = text;
+    document.getElementById("transferHint").textContent = hint;
+    document.getElementById("transferOverlay").classList.remove("hidden");
+  }
+  function closeTransfer(){
+    document.getElementById("transferOverlay").classList.add("hidden");
+  }
+
+  // Export: Download versuchen und zusätzlich das Fenster zum Kopieren anbieten,
+  // denn ob ein Download wirklich ankommt, lässt sich im Browser nicht prüfen.
+  function exportData(){
+    const text = exportJson();
+    tryDownload(text);
+    openTransfer(text, "Export erstellt. Falls kein Download gestartet ist (z. B. in einer abgeschotteten Vorschau), den Text kopieren und als .json-Datei speichern.");
+  }
+
+  function copyTransfer(){
+    const ta = document.getElementById("transferText");
+    ta.focus(); ta.select();
+    let ok = false;
+    try{ ok = document.execCommand("copy"); }catch(e){ ok = false; }
+    if(!ok && navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(ta.value).then(function(){ notify("In die Zwischenablage kopiert."); },
+        function(){ notify("Kopieren nicht möglich. Text bitte manuell markieren (Strg/Cmd+A, Strg/Cmd+C).", true); });
+      return;
+    }
+    notify(ok ? "In die Zwischenablage kopiert." : "Kopieren nicht möglich. Text bitte manuell markieren (Strg/Cmd+A, Strg/Cmd+C).", !ok);
+  }
+
+  function normalizeRows(parsed){
+    if(!Array.isArray(parsed)) throw new Error("JSON ist kein Array.");
+    return parsed.map(function(row, idx){
+      return {
+        id: typeof row.id === "number" ? row.id : idx + 1,
+        category: row.category || "Sonstiges",
+        question: row.question || "",
+        kiAnswer: row.kiAnswer || row.aiAnswer || "",
+        userAnswer: row.userAnswer || row.michaAnswer || ""
+      };
+    }).filter(function(row){ return row.question; });
+  }
+
+  function applyImport(text, replace){
+    try{
+      const normalized = normalizeRows(JSON.parse(text));
+      if(normalized.length === 0){
+        notify("Keine gültigen Fragen gefunden.", true);
+        return;
+      }
+      if(replace){
+        state.data = normalized;
+      }else{
+        let idCounter = nextId();
+        normalized.forEach(function(row){
+          row.id = idCounter++;
+          state.data.push(row);
+        });
+      }
+      persist();
+      renderCategoryFilter();
+      renderTable();
+      closeTransfer();
+      notify(normalized.length + " Fragen " + (replace ? "übernommen (ersetzt)." : "angehängt."));
+    }catch(e){
+      notify("Import fehlgeschlagen: " + e.message, true);
+    }
+  }
+
+  // Import per Datei: Inhalt ins Fenster laden, dort Ersetzen oder Anhängen wählen.
   function importData(file){
     if(!file) return;
     const reader = new FileReader();
     reader.onload = function(evt){
-      try{
-        const parsed = JSON.parse(evt.target.result);
-        if(!Array.isArray(parsed)) throw new Error("JSON ist kein Array.");
-        const normalized = parsed.map(function(row, idx){
-          return {
-            id: typeof row.id === "number" ? row.id : idx + 1,
-            category: row.category || "Sonstiges",
-            question: row.question || "",
-            kiAnswer: row.kiAnswer || row.aiAnswer || "",
-            userAnswer: row.userAnswer || row.michaAnswer || ""
-          };
-        }).filter(function(row){ return row.question; });
-
-        if(normalized.length === 0){
-          alert("Keine gültigen Fragen in der Datei gefunden.");
-          return;
-        }
-
-        if(confirm("Importierte Datei enthält " + normalized.length + " Fragen. Bestehende Daten ersetzen? (Abbrechen = anhängen)")){
-          state.data = normalized;
-        }else{
-          let idCounter = nextId();
-          normalized.forEach(function(row){
-            row.id = idCounter++;
-            state.data.push(row);
-          });
-        }
-        persist();
-        renderCategoryFilter();
-        renderTable();
-      }catch(e){
-        alert("Import fehlgeschlagen: " + e.message);
-      }
+      openTransfer(String(evt.target.result || ""), "Datei geladen. Wähle „Import: Ersetzen“ oder „Import: Anhängen“. Du kannst JSON auch direkt hier einfügen.");
+    };
+    reader.onerror = function(){
+      notify("Datei konnte nicht gelesen werden. JSON stattdessen über „Export / Import“ einfügen.", true);
     };
     reader.readAsText(file);
   }
@@ -642,11 +769,28 @@
     document.getElementById("saveBtn").addEventListener("click", saveEdit);
     document.getElementById("deleteBtn").addEventListener("click", deleteCurrentRow);
     document.getElementById("cancelBtn").addEventListener("click", closeModal);
+    document.getElementById("confirmNo").addEventListener("click", closeConfirm);
+    document.getElementById("confirmYes").addEventListener("click", function(){
+      const cb = confirmYesCb; closeConfirm(); if(cb) cb();
+    });
+    document.getElementById("transferClose").addEventListener("click", closeTransfer);
+    document.getElementById("transferCopy").addEventListener("click", copyTransfer);
+    document.getElementById("transferDownload").addEventListener("click", function(){
+      if(!tryDownload(document.getElementById("transferText").value)){
+        notify("Download nicht möglich. Bitte kopieren.", true);
+      }
+    });
+    document.getElementById("transferReplace").addEventListener("click", function(){
+      applyImport(document.getElementById("transferText").value, true);
+    });
+    document.getElementById("transferAppend").addEventListener("click", function(){
+      applyImport(document.getElementById("transferText").value, false);
+    });
     document.getElementById("modalOverlay").addEventListener("click", function(e){
       if(e.target.id === "modalOverlay") closeModal();
     });
     document.addEventListener("keydown", function(e){
-      if(e.key === "Escape") closeModal();
+      if(e.key === "Escape"){ closeModal(); closeConfirm(); closeTransfer(); }
     });
   }
 
